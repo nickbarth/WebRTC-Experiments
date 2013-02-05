@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+  <body>
+    <video id="video1" autoplay style="height: 200px; width: 500px;"></video>
+    <video id="video2" autoplay style="height: 200px; width: 500px;"></video>
+
+    <button id="button3">Hangup</button>
+    <script>
+      performance.now = performance.now || performance.webkitNow; // hack added by SD!
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia 
+
+      var peer1, peer2, localstream;
+
+      console.log("Requesting local stream");
+
+      navigator.getUserMedia({audio:true, video:true}, function (stream) {
+        console.log("Received local stream");
+        video1.src = window.URL.createObjectURL(stream);
+        localstream = stream;
+
+        /////////////////
+
+        console.log("Starting call");
+
+        var servers = null;
+        console.log("Created local peer connection object peer1");
+        peer1 = new webkitRTCPeerConnection(servers);
+        peer1.onicecandidate = (function (event) {
+          if (event.candidate) {
+            peer2.addIceCandidate(new RTCIceCandidate(event.candidate));
+            console.log("Local ICE candidate: \n" + event.candidate.candidate);
+          }
+        });
+
+        console.log("Created remote peer connection object peer2");
+        peer2 = new webkitRTCPeerConnection(servers);
+        peer2.onicecandidate = (function (event) {
+          if (event.candidate) {
+            peer1.addIceCandidate(new RTCIceCandidate(event.candidate));
+            console.log("Remote ICE candidate: \n " + event.candidate.candidate);
+          }
+        });
+
+        peer2.onaddstream = (function (e) {
+          video2.src = webkitURL.createObjectURL(e.stream);
+          console.log("Received remote stream");
+        });
+
+        console.log("Adding Local Stream to peer connection");
+        peer1.addStream(localstream);
+        peer1.createOffer(function (desc) {
+          console.log("Offer from peer1 \n" + desc.sdp);
+          peer1.setLocalDescription(desc);
+          peer2.setRemoteDescription(desc);
+
+          peer2.createAnswer(function (desc) {
+            console.log("Answer from peer2 \n" + desc.sdp);
+            peer2.setLocalDescription(desc);
+            peer1.setRemoteDescription(desc);
+          });
+        });
+      });
+
+      function hangup() {
+        console.log("Ending call");
+        peer1.close();
+        peer2.close();
+        peer1 = null;
+        peer2 = null;
+      }
+    </script>
+  </body>
+</html>

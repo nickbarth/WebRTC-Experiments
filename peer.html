@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+  <body>
+    <video class="one" autoplay style="height: 200px; width: 500px;"></video>
+    <video class="two" autoplay style="height: 200px; width: 500px;"></video>
+
+    <button class="one">Start</button>
+    <button class="two">Call</button>
+    <script>
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia 
+    window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+    var video1 = document.querySelector("video.one"),
+        video2 = document.querySelector("video.two"),
+        button1 = document.querySelector("button.one"),
+        button2 = document.querySelector("button.two"),
+        mediaStream = null;
+
+
+    button1.onclick = (function () {
+      console.log("Local stream request.")
+      navigator.getUserMedia({video: true}, function (stream) {
+        mediaStream = stream; // Save stream
+        video1.src = webkitURL.createObjectURL(stream);
+        console.log("Local stream received.")
+      });
+    });
+
+    button2.onclick = (function () {
+      console.log("Create peer connections.")
+      peer1 = new webkitRTCPeerConnection(null);
+      peer2 = new webkitRTCPeerConnection(null);
+
+      peer1.onicecandidate = (function (event) {
+        if (event.candidate) {
+          console.log("Local ICE candidate");
+          peer2.addIceCandidate(new RTCIceCandidate(event.candidate));
+        }
+      });
+
+      peer2.onicecandidate = (function (event) {
+        if (event.candidate) {
+          console.log("Remote ICE canidate");
+          peer1.addIceCandidate(new RTCIceCandidate(event.candidate));
+        }
+      });
+
+      peer2.onaddstream = (function (event) {
+        console.log("Remote stream added")
+        video2.src = window.URL.createObjectURL(event.stream);
+      });
+
+      peer1.addStream(mediaStream);
+
+      peer1.createOffer(function (desc) {
+        console.log("Offer from Peer1." + desc.sdp)
+        peer1.setRemoteDescription(desc);
+        peer2.setRemoteDescription(desc);
+
+        peer2.createAnswer(function (desc) {
+          peer2.setLocalDescription(desc);
+          console.log("Answer from Peer2." + desc.sdp)
+          peer1.setRemoteDescription(desc);
+        });
+      });
+    });
+
+    window.onload = (function () { });
+    </script>
+  </body>
+</html>

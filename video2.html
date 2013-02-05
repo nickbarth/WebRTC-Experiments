@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+  <body>
+    <center>
+      <h2>Video 2 - Receiver</h2>
+      <hr/>
+      <video id="video1" autoplay style="height: 200px"></video>
+      <video id="video2" autoplay style="height: 200px"></video>
+      <hr/>
+      <h3>Create Answer</h3>
+      <textarea id="textarea1" style="height: 300px; width: 500px"></textarea>
+      <br/><button id="button1">Create Answer</button>
+      <hr/>
+      <h3>Answer</h3>
+      <textarea id="textarea2" style="height: 300px; width: 500px"></textarea>
+      <hr/>
+      <h3>This Peer Canidate</h3>
+      <textarea id="textarea3" style="height: 300px; width: 500px"></textarea>
+      <hr/>
+      <h3>Submit Peer Canidate</h3>
+      <textarea id="textarea4" style="height: 300px; width: 500px"></textarea>
+      <br/><button id="button3">Submit Canidate</button>
+    </center>
+    <script>
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia 
+      window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+      var servers = { "iceServers": [{ "url": "stun:stun.l.google.com:19302" }] },
+          peer2 = new webkitRTCPeerConnection(servers);
+
+      // Initialize first webcam and stream
+      navigator.getUserMedia({audio:true, video:true}, function (stream) {
+        peer2.addStream(stream);
+        video1.src = window.URL.createObjectURL(stream);
+      });
+
+      // Set Remote and get Answer
+      button1.onclick = (function () {
+        peer2.setRemoteDescription(new RTCSessionDescription(JSON.parse(textarea1.value)));
+        peer2.createAnswer(function (desc) {
+          peer2.setLocalDescription(desc);
+          textarea2.value = JSON.stringify(desc);
+        });
+      });
+
+      // Add Remote Web Cam
+      peer2.onaddstream = (function (e) {
+        console.log("Received remote stream");
+        video2.src = webkitURL.createObjectURL(e.stream);
+      });
+
+      // Display Peer Canidate
+      peer2.onicecandidate = (function (event) {
+        if (event.candidate) {
+          textarea3.value += JSON.stringify(event.candidate) + "|";
+        }
+      });
+
+      // Receive Peer Candidate
+      button3.onclick = (function () {
+        var canidates = textarea4.value.split("|"),
+            index = 0;
+        for(index in canidates) {
+          if (canidates[index] !== "") {
+            peer2.addIceCandidate(new RTCIceCandidate(JSON.parse(canidates[index])));
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+<center>
+  <button>Start</button>
+  <hr/>
+  <div style="width: 50%; float: left;">
+    <h2>Local Webcam</h2>
+    <video autoplay style="height: 200px;"></video>
+  </div>
+  <div style="width: 50%; float: right;">
+    <h2>Server Stream</h2>
+    <img src="" style="height: 200px;" />
+  </div>
+  <div style="clear:both;"></div><hr/>
+  <canvas style="height: 200px; display: none; "></canvas>
+</center>
+
+<script src="http://formsends.com:1337/socket.io/socket.io.js"></script>
+<script>
+navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia 
+window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+var video = document.querySelector("video"),
+    canvas = document.querySelector("canvas"),
+    context = canvas.getContext("2d"),
+    button = document.querySelector("button"),
+    image = document.querySelector("img"),
+    mediaStream = null,
+    doUpdate = (function () {
+      context.drawImage(video, 0, 0, video.clientWidth / 2, video.clientHeight / 2);
+      // image.src = canvas.toDataURL();
+      socket.emit('update', canvas.toDataURL());
+      setTimeout(function () {
+        if (video.src !== "") doUpdate()
+      }, 1000);
+    }),
+    socket = io.connect('ws://formsends.com:1337');
+
+button.onclick = (function () {
+  if (video.src === "") {
+    button.innerHTML = "Stop";
+    navigator.getUserMedia({video: true}, function (stream) {
+      mediaStream = stream;
+      video.src = window.URL.createObjectURL(stream);
+      doUpdate();
+    });
+  } else {
+    button.innerHTML = "Start";
+    video.pause();
+    mediaStream.stop();
+    video.src = null;
+  }
+});
+
+socket.on('update', function (src) {
+  image.src = src;
+});
+</script>
