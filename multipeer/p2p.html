@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+  <body>
+    <center>
+      <h2>P2P Chat</h2>
+      <hr/>
+      <div id="videos"></div>
+      <hr/>
+      <button id="startButton">Connection</button>
+    </center>
+    <script src="http://formsends.com:1337/socket.io/socket.io.js"></script>
+    <script>
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia 
+      window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+      var servers = { "iceServers": [{ "url": "stun:stun.l.google.com:19302" }] },
+          uid = 0,
+          connections = {},
+          localStream = null,
+          peers = [],
+          socket = io.connect('http://formsends.com:1337');
+
+      startButton.disabled = true;
+
+      // Create Video Stream
+      function addVideoStream (stream) {
+        var video = document.createElement('video');
+        video.setAttribute('autoplay', true);
+        video.style.height = '200px';
+        video.src = window.URL.createObjectURL(stream);
+        videos.appendChild(video);
+      }
+
+      // Create New Connection
+      function createConnection (id) {
+        var connection = new webkitRTCPeerConnection(servers);
+        connection.addStream(localStream);
+
+        // Send Ice
+        connection.onicecandidate = ((function (_id) {
+          return (function (event) {
+            if (event.candidate) {
+              // Send Peer ICE Canidate Data
+              console.log('Send ICE : id - ' + _id);
+              socket.emit('sendICECanidate', JSON.stringify(event.candidate), _id);
+            }
+          });
+        })(id));
+
+        // Add Remote Web Cam
+        connection.onaddstream = (function (_id) {
+          return (function (e) {
+            console.log('Received Stream : id - ' + _id);
+            addVideoStream(e.stream);
+          });
+        })(id);
+
+        return connection;
+      }
+
+      // Initialize Local Stream
+      navigator.getUserMedia({audio:true, video:true}, function (stream) {
+        localStream = stream;
+        addVideoStream(stream);
+        startButton.disabled = false;
+      });
+
+      // Create and Send Offer
+      startButton.onclick = (function () {
+        socket.emit('connect');
+      });
+
+      socket.on('peerConnected', function (id) {
+        connections[id] = createConnection(id);
+        console.log('Peer Connected : id - ' + id);
+
+        // Create new Offer
+        connections[id].createOffer((function (_id) {
+          return (function (RTCDescription) {
+            connections[_id].setLocalDescription(RTCDescription);
+            console.log('Sending Offer : id - ' + _id);
+            socket.emit('sendOffer', JSON.stringify(RTCDescription), _id);
+          });
+        })(id));
+      });
+
+      // Receive Offer and Send Answer
+      socket.on('receiveOffer', function (RTCDescription, id) {
+        connections[id] = createConnection(id);
+        console.log('Received Offer : id - ' + id);
+
+        connections[id].setRemoteDescription(new RTCSessionDescription(JSON.parse(RTCDescription)));
+        connections[id].createAnswer((function (_id) {
+          return (function (RTCDescription) {
+            connections[_id].setLocalDescription(RTCDescription);
+            console.log('Sending Answer : id - ' + _id);
+            socket.emit('sendAnswer', JSON.stringify(RTCDescription), _id);
+          });
+        })(id));
+      });
+
+      // Receive Answer
+      socket.on('receiveAnswer', function (RTCDescription, id) {
+        console.log('Received Answer : id - ' + id);
+        connections[id].setRemoteDescription(new RTCSessionDescription(JSON.parse(RTCDescription)));
+      });
+
+      // Receive ICE Canidate Data
+      socket.on('receiveICECanidate', function (ICECanidate, id) {
+        console.log('Received ICE : id - ' + id);
+        connections[id].addIceCandidate(new RTCIceCandidate(JSON.parse(ICECanidate)));
+      });
+    </script>
+  </body>
+</html>
